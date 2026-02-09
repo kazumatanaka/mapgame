@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>日本地図クイズ（Geolonia版）</title>
+<title>日本地図クイズ（完結編）</title>
 <style>
   body { font-family: "Hiragino Maru Gothic Pro", "Yu Gothic", sans-serif; text-align: center; background-color: #e0f7fa; padding: 20px; }
   
@@ -21,32 +21,17 @@
   /* SVGの設定 */
   svg { width: 100%; height: auto; display: block; }
   
-  /* 地図のスタイル */
-  .prefecture polygon, .prefecture path { 
-    fill: #EEEEEE; /* 元の色 */
-    stroke: #999; 
-    stroke-width: 1px; 
-    cursor: pointer;
-    transition: fill 0.2s; 
-  }
-  
-  /* マウスを乗せた時 */
-  .prefecture:hover polygon, .prefecture:hover path { 
-    fill: #b2ebf2; 
-  }
-  
-  /* ★重要：出題中の色（赤） */
-  /* gタグにactiveがついた時、その中のポリゴンを赤くする */
-  g.active polygon, g.active path { 
-    fill: #ff5252 !important; 
-    stroke: #ff5252 !important;
-  }
+  /* マウスを乗せた時のカーソル */
+  g { cursor: pointer; transition: opacity 0.2s; }
+  g:hover { opacity: 0.7; }
 
   /* UI */
   #message { font-size: 22px; font-weight: bold; color: #bf360c; margin: 10px; min-height: 1.5em; }
   #status { color: #555; font-size: 14px; margin-bottom: 20px;}
   button { padding: 15px 40px; font-size: 20px; background: #ffca28; border: none; border-radius: 50px; cursor: pointer; font-weight: bold; box-shadow: 0 4px #c6a700; }
   
+  /* デバッグ用 */
+  #debug { font-size: 12px; color: #999; margin-top: 20px;}
 </style>
 </head>
 <body>
@@ -61,6 +46,8 @@
 
 <div id="map-container">
   </div>
+
+<div id="debug"></div>
 
 <script>
   // --- 1. データ定義 (JISコード 1〜47) ---
@@ -118,7 +105,10 @@
   let mistakeCount = 0;
   let mode = "pref";
   let isTalking = false;
-  
+  // ★現在赤く塗っている要素を覚えておく変数
+  let activeElement = null; 
+  let originalFill = ""; 
+
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   const recognition = new SpeechRecognition();
   recognition.lang = 'ja-JP';
@@ -133,28 +123,28 @@
       })
       .then(svgText => {
         document.getElementById('map-container').innerHTML = svgText;
-        
         document.getElementById('message').innerText = "スタートボタンを押してね";
         document.getElementById('btn-start').disabled = false;
         document.getElementById('btn-start').innerText = "クイズスタート！";
       })
       .catch(err => {
         document.getElementById('message').innerText = "エラー：地図を読み込めません";
-        document.getElementById('status').innerText = "japan.svg が同じフォルダにあるか確認してください。\nChromeの場合はNetlify Drop等を使用してください。";
+        document.getElementById('status').innerText = "japan.svg が同じフォルダにあるか確認してください。";
       });
   };
 
-  // --- ★重要：この地図専用の探し方 ---
+  // --- ★重要：県を探す関数（改良版） ---
   function findPrefectureElement(jisCode) {
     const svg = document.querySelector('svg');
     if (!svg) return null;
-
-    // あなたの地図は data-code="01" のように2桁の数字を使っています
-    // なので、数字を2桁の文字列に変換します (1 -> "01")
-    const codeStr = jisCode.toString().padStart(2, '0');
     
-    // data-code が一致するグループ(gタグ)を探す
-    return svg.querySelector(`g[data-code="${codeStr}"]`);
+    // "1" と "01" 両方のパターンで探す
+    const code1 = jisCode.toString(); 
+    const code2 = jisCode.toString().padStart(2, '0');
+    
+    // グループタグ <g data-code="..."> を探す
+    let el = svg.querySelector(`g[data-code="${code1}"]`) || svg.querySelector(`g[data-code="${code2}"]`);
+    return el;
   }
 
   // --- ゲーム進行 ---
@@ -170,22 +160,33 @@
     mode = "pref";
     mistakeCount = 0;
     
-    // 赤色リセット (activeクラスを外す)
-    document.querySelectorAll('.active').forEach(el => el.classList.remove('active'));
+    // ★前の問題をリセット（色を元に戻す）
+    if (activeElement) {
+        activeElement.style.fill = originalFill; // 元の色に戻す
+        activeElement = null;
+    }
 
     // ランダム出題
     const randomIndex = Math.floor(Math.random() * prefectures.length);
     currentPref = prefectures[randomIndex];
 
-    // 地図上の要素を探して赤くする
+    // 要素を探す
     const targetEl = findPrefectureElement(currentPref.jis);
 
     if(targetEl) {
-        // グループ(gタグ)にクラスをつける
-        targetEl.classList.add('active');
+        // ★重要：強制的に色を塗る
+        activeElement = targetEl; // 覚えておく
+        originalFill = targetEl.style.fill; // 元の色を保存しておく
+        
+        // style属性を直接書き換えて赤くする（これが最強）
+        targetEl.style.fill = "#ff5252"; 
+        
+        // デバッグ用表示
+        document.getElementById('debug').innerText = `出題中: ${currentPref.names[0]} (Code: ${currentPref.jis})`;
+
         speak("ここはどこ？");
     } else {
-        console.error(`県が見つかりません (JIS: ${currentPref.jis})`);
+        document.getElementById('debug').innerText = `エラー: ${currentPref.names[0]} の地図データが見つかりません`;
         nextQuestion(); // 見つからない場合はスキップ
     }
   }
@@ -203,7 +204,6 @@
     let isCorrect = false;
     let correctList = (mode === "pref") ? currentPref.names : currentPref.capitalNames;
     
-    // 部分一致判定 (「愛知県」に対して「愛知」でもOK)
     correctList.forEach(ans => {
       if (text.indexOf(ans) !== -1) isCorrect = true;
     });
