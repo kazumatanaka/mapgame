@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>都道府県マスター (分析＆地方選択版)</title>
+    <title>都道府県マスター (回答フィードバック修正版)</title>
     <style>
         body { font-family: "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif; text-align: center; background-color: #f0f8ff; padding: 20px; color: #333; }
         h1 { font-size: 24px; margin-bottom: 10px; }
@@ -120,7 +120,6 @@
     function playWrongSound(){ initAudio(); playTone(150,'sawtooth',0.15,audioCtx.currentTime); playTone(150,'sawtooth',0.15,audioCtx.currentTime+0.2); }
 
     // --- Data ---
-    // Region: 1=Hokkaido/Tohoku, 2=Kanto, 3=Chubu, 4=Kinki, 5=Chugoku, 6=Shikoku, 7=Kyushu/Okinawa
     const prefs = [
         { id: 1, name: "北海道", capital: "札幌", yomi: "ほっかいどう", cYomi: "さっぽろ", diff: true, reg: 1 },
         { id: 2, name: "青森", capital: "青森", yomi: "あおもり", cYomi: "あおもり", diff: false, reg: 1 },
@@ -341,6 +340,27 @@
     }
 
     function checkVoiceAnswer(text) {
+        // Find which prefecture/capital user mentioned
+        let userSaid = "";
+        // Match against any known pref/capital
+        const matched = prefs.find(p => 
+            text.includes(p.name) || text.includes(p.yomi) || 
+            text.includes(p.capital) || text.includes(p.cYomi)
+        );
+
+        if (matched) {
+            // Did they say the capital or the pref name?
+            if (text.includes(matched.capital) || text.includes(matched.cYomi)) {
+                userSaid = matched.capital;
+            } else {
+                userSaid = matched.name;
+            }
+        } else {
+            // If recognized text is short, use it. Else generic "that"
+            userSaid = (text.length > 0 && text.length < 10) ? text : "それ";
+        }
+
+        // Prepare Check Logic
         text = text.replace(/県|市|府|都|区/g, "");
         const pName = currentPref.name.replace(/県|市|府|都/g, "");
         const pCap = currentPref.capital.replace(/県|市|府|都/g, "");
@@ -363,7 +383,7 @@
                     document.getElementById('result-message').className = "result-msg correct";
                     return;
                 } else {
-                    handleMistake(`違うよ、${currentPref.name}じゃないよ`, `正解は「${currentPref.name}」でした。`);
+                    handleMistake(`違うよ、${userSaid}じゃないよ`, `正解は「${currentPref.name}」でした。`);
                     return;
                 }
             } else {
@@ -372,16 +392,16 @@
                     msg = `正解！${currentPref.capital}！`;
                     saveResult = true; // Save success on completion
                 } else {
-                    handleMistake(`違うよ、${currentPref.capital}じゃないよ`, `正解は「${currentPref.capital}」でした。`);
+                    handleMistake(`違うよ、${userSaid}じゃないよ`, `正解は「${currentPref.capital}」でした。`);
                     return;
                 }
             }
         } else if (currentMode === 3) {
             if (text.includes(pCap) || text.includes(cYomi)) { isCorrect = true; msg = `正解！ ${currentPref.capital}`; saveResult = true; }
-            else msg = `違うよ...`;
+            else { handleMistake(`違うよ、${userSaid}じゃないよ`, `正解は「${currentPref.capital}」でした。`); return; }
         } else if (currentMode === 4) {
             if (text.includes(pName) || text.includes(pYomi)) { isCorrect = true; msg = `正解！ ${currentPref.name}県`; saveResult = true; }
-            else msg = `違うよ...`;
+            else { handleMistake(`違うよ、${userSaid}じゃないよ`, `正解は「${currentPref.name}県」でした。`); return; }
         }
 
         processResult(isCorrect, msg, saveResult);
@@ -410,8 +430,6 @@
         playWrongSound();
         mistakes++;
         
-        // Save failure on first mistake? Or save failure only if gave up? 
-        // Let's save "Fail" immediately to track attempts strictly.
         saveScore(currentPref.id, false); 
 
         if (mistakes >= 3) {
