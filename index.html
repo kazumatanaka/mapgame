@@ -1,254 +1,362 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>日本地図クイズ（完結編）</title>
-<style>
-  body { font-family: "Hiragino Maru Gothic Pro", "Yu Gothic", sans-serif; text-align: center; background-color: #e0f7fa; padding: 20px; }
-  
-  /* 地図表示エリア */
-  #map-container {
-    width: 100%;
-    max-width: 800px;
-    margin: 10px auto;
-    border: 4px solid #4dd0e1;
-    border-radius: 10px;
-    background: white;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-  }
-  
-  /* SVGの設定 */
-  svg { width: 100%; height: auto; display: block; }
-  
-  /* マウスを乗せた時のカーソル */
-  g { cursor: pointer; transition: opacity 0.2s; }
-  g:hover { opacity: 0.7; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>都道府県＆県庁所在地マスター</title>
+    <style>
+        body { font-family: "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif; text-align: center; background-color: #f0f8ff; padding: 20px; }
+        h1 { color: #333; font-size: 24px; margin-bottom: 10px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        
+        /* Menu Buttons */
+        .menu-btn { display: block; width: 100%; margin: 10px 0; padding: 15px; font-size: 18px; color: white; background-color: #4CAF50; border: none; border-radius: 8px; cursor: pointer; transition: background 0.3s; }
+        .menu-btn:hover { background-color: #45a049; }
+        .menu-btn:nth-child(3), .menu-btn:nth-child(4) { background-color: #2196F3; } /* Different color for harder modes */
 
-  /* UI */
-  #message { font-size: 22px; font-weight: bold; color: #bf360c; margin: 10px; min-height: 1.5em; }
-  #status { color: #555; font-size: 14px; margin-bottom: 20px;}
-  button { padding: 15px 40px; font-size: 20px; background: #ffca28; border: none; border-radius: 50px; cursor: pointer; font-weight: bold; box-shadow: 0 4px #c6a700; }
-  
-  /* デバッグ用 */
-  #debug { font-size: 12px; color: #999; margin-top: 20px;}
-</style>
+        /* Game Area */
+        #game-area { display: none; }
+        .question-box { font-size: 32px; font-weight: bold; margin: 20px 0; min-height: 50px; color: #333; }
+        .sub-text { font-size: 16px; color: #666; margin-bottom: 20px; }
+        
+        /* Map (CSS Grid Simplified Japan) */
+        .japan-map {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            grid-template-rows: repeat(12, 1fr);
+            gap: 4px;
+            max-width: 600px;
+            margin: 0 auto;
+            aspect-ratio: 1 / 1;
+        }
+        .pref-cell {
+            background-color: #ddd;
+            border: 1px solid #999;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s;
+            position: relative;
+        }
+        .pref-cell:hover { background-color: #ccc; }
+        .pref-cell.active { background-color: #ff5722 !important; color: white; font-weight: bold; transform: scale(1.1); z-index: 10; }
+        .pref-cell.correct { background-color: #4CAF50 !important; color: white; }
+        
+        /* Voice Button */
+        #mic-btn {
+            font-size: 24px; padding: 15px 30px; border-radius: 50px; border: none;
+            background-color: #ff5722; color: white; cursor: pointer; margin-top: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+        #mic-btn.listening { background-color: #dc3545; animation: pulse 1.5s infinite; }
+        #mic-btn:disabled { background-color: #ccc; cursor: not-allowed; }
+
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+
+        .result-msg { font-size: 20px; font-weight: bold; margin-top: 15px; min-height: 30px; }
+        .result-msg.correct { color: #2e7d32; }
+        .result-msg.wrong { color: #d32f2f; }
+
+        .back-btn { margin-top: 30px; background: #777; padding: 10px 20px; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    </style>
 </head>
 <body>
 
-<h1>🗾 日本地図クイズ</h1>
+<div class="container">
+    <div id="menu-area">
+        <h1>🇯🇵 日本地図＆県庁所在地ゲーム</h1>
+        <p>遊びたいモードを選んでね</p>
+        <button class="menu-btn" onclick="startGame(1)">1. 地図から「県名・県庁所在地」を言う</button>
+        <button class="menu-btn" onclick="startGame(2)">2. 県名を見て「地図」を当てる</button>
+        <button class="menu-btn" onclick="startGame(3)">3. 県名から「県庁所在地」を言う（違う19個）</button>
+        <button class="menu-btn" onclick="startGame(4)">4. 県庁所在地から「県名」を言う（違う19個）</button>
+    </div>
 
-<div id="game-area">
-  <div id="message">地図を読み込んでいます...</div>
-  <div id="status"></div>
-  <button id="btn-start" onclick="startGame()" disabled>準備中</button>
+    <div id="game-area">
+        <h2 id="mode-title">ゲームモード</h2>
+        <div class="question-box" id="question-text">ここに問題が出ます</div>
+        <div class="sub-text" id="instruction-text">説明</div>
+
+        <div id="map-container" class="japan-map">
+            </div>
+
+        <div id="voice-controls">
+            <button id="mic-btn" onclick="toggleRecognition()">🎤 答える</button>
+            <div id="voice-status">ボタンを押して話してね</div>
+        </div>
+
+        <div class="result-msg" id="result-message"></div>
+
+        <button class="back-btn" onclick="showMenu()">メニューに戻る</button>
+    </div>
 </div>
 
-<div id="map-container">
-  </div>
-
-<div id="debug"></div>
-
 <script>
-  // --- 1. データ定義 (JISコード 1〜47) ---
-  const prefectures = [
-    { jis: 1, names: ["北海道", "ほっかいどう"], capital: "札幌", capitalNames: ["札幌", "さっぽろ"] },
-    { jis: 2, names: ["青森", "青森県", "あおもり"], capital: "青森", capitalNames: ["青森", "あおもり"] },
-    { jis: 3, names: ["岩手", "岩手県", "いわて"], capital: "盛岡", capitalNames: ["盛岡", "もりおか"] },
-    { jis: 4, names: ["宮城", "宮城県", "みやぎ"], capital: "仙台", capitalNames: ["仙台", "せんだい"] },
-    { jis: 5, names: ["秋田", "秋田県", "あきた"], capital: "秋田", capitalNames: ["秋田", "あきた"] },
-    { jis: 6, names: ["山形", "山形県", "やまがた"], capital: "山形", capitalNames: ["山形", "やまがた"] },
-    { jis: 7, names: ["福島", "福島県", "ふくしま"], capital: "福島", capitalNames: ["福島", "ふくしま"] },
-    { jis: 8, names: ["茨城", "茨城県", "いばらき"], capital: "水戸", capitalNames: ["水戸", "みと"] },
-    { jis: 9, names: ["栃木", "栃木県", "とちぎ"], capital: "宇都宮", capitalNames: ["宇都宮", "うつのみや"] },
-    { jis: 10, names: ["群馬", "群馬県", "ぐんま"], capital: "前橋", capitalNames: ["前橋", "まえばし"] },
-    { jis: 11, names: ["埼玉", "埼玉県", "さいたま"], capital: "さいたま", capitalNames: ["さいたま", "浦和"] },
-    { jis: 12, names: ["千葉", "千葉県", "ちば"], capital: "千葉", capitalNames: ["千葉", "ちば"] },
-    { jis: 13, names: ["東京", "東京都", "とうきょう"], capital: "東京", capitalNames: ["東京", "新宿"] },
-    { jis: 14, names: ["神奈川", "神奈川県", "かながわ"], capital: "横浜", capitalNames: ["横浜", "よこはま"] },
-    { jis: 15, names: ["新潟", "新潟県", "にいがた"], capital: "新潟", capitalNames: ["新潟", "にいがた"] },
-    { jis: 16, names: ["富山", "富山県", "とやま"], capital: "富山", capitalNames: ["富山", "とやま"] },
-    { jis: 17, names: ["石川", "石川県", "いしかわ"], capital: "金沢", capitalNames: ["金沢", "かなざわ"] },
-    { jis: 18, names: ["福井", "福井県", "ふくい"], capital: "福井", capitalNames: ["福井", "ふくい"] },
-    { jis: 19, names: ["山梨", "山梨県", "やまなし"], capital: "甲府", capitalNames: ["甲府", "こうふ"] },
-    { jis: 20, names: ["長野", "長野県", "ながの"], capital: "長野", capitalNames: ["長野", "ながの"] },
-    { jis: 21, names: ["岐阜", "岐阜県", "ぎふ"], capital: "岐阜", capitalNames: ["岐阜", "ぎふ"] },
-    { jis: 22, names: ["静岡", "静岡県", "しずおか"], capital: "静岡", capitalNames: ["静岡", "しずおか"] },
-    { jis: 23, names: ["愛知", "愛知県", "あいち"], capital: "名古屋", capitalNames: ["名古屋", "なごや"] },
-    { jis: 24, names: ["三重", "三重県", "みえ"], capital: "津", capitalNames: ["津", "つ"] },
-    { jis: 25, names: ["滋賀", "滋賀県", "しが"], capital: "大津", capitalNames: ["大津", "おおつ"] },
-    { jis: 26, names: ["京都", "京都府", "きょうと"], capital: "京都", capitalNames: ["京都", "きょうと"] },
-    { jis: 27, names: ["大阪", "大阪府", "おおさか"], capital: "大阪", capitalNames: ["大阪", "おおさか"] },
-    { jis: 28, names: ["兵庫", "兵庫県", "ひょうご"], capital: "神戸", capitalNames: ["神戸", "こうべ"] },
-    { jis: 29, names: ["奈良", "奈良県", "なら"], capital: "奈良", capitalNames: ["奈良", "なら"] },
-    { jis: 30, names: ["和歌山", "和歌山県", "わかやま"], capital: "和歌山", capitalNames: ["和歌山", "わかやま"] },
-    { jis: 31, names: ["鳥取", "鳥取県", "とっとり"], capital: "鳥取", capitalNames: ["鳥取", "とっとり"] },
-    { jis: 32, names: ["島根", "島根県", "しまね"], capital: "松江", capitalNames: ["松江", "まつえ"] },
-    { jis: 33, names: ["岡山", "岡山県", "おかやま"], capital: "岡山", capitalNames: ["岡山", "おかやま"] },
-    { jis: 34, names: ["広島", "広島県", "ひろしま"], capital: "広島", capitalNames: ["広島", "ひろしま"] },
-    { jis: 35, names: ["山口", "山口県", "やまぐち"], capital: "山口", capitalNames: ["山口", "やまぐち"] },
-    { jis: 36, names: ["徳島", "徳島県", "とくしま"], capital: "徳島", capitalNames: ["徳島", "とくしま"] },
-    { jis: 37, names: ["香川", "香川県", "かがわ"], capital: "高松", capitalNames: ["高松", "たかまつ"] },
-    { jis: 38, names: ["愛媛", "愛媛県", "えひめ"], capital: "松山", capitalNames: ["松山", "まつやま"] },
-    { jis: 39, names: ["高知", "高知県", "こうち"], capital: "高知", capitalNames: ["高知", "こうち"] },
-    { jis: 40, names: ["福岡", "福岡県", "ふくおか"], capital: "福岡", capitalNames: ["福岡", "ふくおか"] },
-    { jis: 41, names: ["佐賀", "佐賀県", "さが"], capital: "佐賀", capitalNames: ["佐賀", "さが"] },
-    { jis: 42, names: ["長崎", "長崎県", "ながさき"], capital: "長崎", capitalNames: ["長崎", "ながさき"] },
-    { jis: 43, names: ["熊本", "熊本県", "くまもと"], capital: "熊本", capitalNames: ["熊本", "くまもと"] },
-    { jis: 44, names: ["大分", "大分県", "おおいた"], capital: "大分", capitalNames: ["大分", "おおいた"] },
-    { jis: 45, names: ["宮崎", "宮崎県", "みやざき"], capital: "宮崎", capitalNames: ["宮崎", "みやざき"] },
-    { jis: 46, names: ["鹿児島", "鹿児島県", "かごしま"], capital: "鹿児島", capitalNames: ["鹿児島", "かごしま"] },
-    { jis: 47, names: ["沖縄", "沖縄県", "おきなわ"], capital: "那覇", capitalNames: ["那覇", "なは"] }
-  ];
+    // --- Data: 47 Prefectures ---
+    // diff: true means name != capital (Target 19)
+    const prefs = [
+        { id: 1, name: "北海道", capital: "札幌", yomi: "ほっかいどう", cYomi: "さっぽろ", r: 1, c: 11, w: 2, h: 2, diff: true },
+        { id: 2, name: "青森", capital: "青森", yomi: "あおもり", cYomi: "あおもり", r: 3, c: 11, w: 1, h: 1, diff: false },
+        { id: 3, name: "岩手", capital: "盛岡", yomi: "いわて", cYomi: "もりおか", r: 4, c: 11, w: 1, h: 1, diff: true },
+        { id: 4, name: "宮城", capital: "仙台", yomi: "みやぎ", cYomi: "せんだい", r: 5, c: 11, w: 1, h: 1, diff: true },
+        { id: 5, name: "秋田", capital: "秋田", yomi: "あきた", cYomi: "あきた", r: 4, c: 10, w: 1, h: 1, diff: false },
+        { id: 6, name: "山形", capital: "山形", yomi: "やまがた", cYomi: "やまがた", r: 5, c: 10, w: 1, h: 1, diff: false },
+        { id: 7, name: "福島", capital: "福島", yomi: "ふくしま", cYomi: "ふくしま", r: 6, c: 11, w: 1, h: 1, diff: false },
+        { id: 8, name: "茨城", capital: "水戸", yomi: "いばらき", cYomi: "みと", r: 7, c: 11, w: 1, h: 1, diff: true },
+        { id: 9, name: "栃木", capital: "宇都宮", yomi: "とちぎ", cYomi: "うつのみや", r: 6, c: 10, w: 1, h: 1, diff: true },
+        { id: 10, name: "群馬", capital: "前橋", yomi: "ぐんま", cYomi: "まえばし", r: 6, c: 9, w: 1, h: 1, diff: true },
+        { id: 11, name: "埼玉", capital: "さいたま", yomi: "さいたま", cYomi: "さいたま", r: 7, c: 9, w: 1, h: 1, diff: true }, // Name same, but Kanji diff or City diff
+        { id: 12, name: "千葉", capital: "千葉", yomi: "ちば", cYomi: "ちば", r: 8, c: 11, w: 1, h: 1, diff: false },
+        { id: 13, name: "東京", capital: "新宿", yomi: "とうきょう", cYomi: "しんじゅく", r: 8, c: 9, w: 1, h: 1, diff: true }, // Special
+        { id: 14, name: "神奈川", capital: "横浜", yomi: "かながわ", cYomi: "よこはま", r: 8, c: 8, w: 1, h: 1, diff: true },
+        { id: 15, name: "新潟", capital: "新潟", yomi: "にいがた", cYomi: "にいがた", r: 5, c: 9, w: 1, h: 1, diff: false },
+        { id: 16, name: "富山", capital: "富山", yomi: "とやま", cYomi: "とやま", r: 5, c: 8, w: 1, h: 1, diff: false },
+        { id: 17, name: "石川", capital: "金沢", yomi: "いしかわ", cYomi: "かなざわ", r: 4, c: 7, w: 1, h: 1, diff: true },
+        { id: 18, name: "福井", capital: "福井", yomi: "ふくい", cYomi: "ふくい", r: 5, c: 7, w: 1, h: 1, diff: false },
+        { id: 19, name: "山梨", capital: "甲府", yomi: "やまなし", cYomi: "こうふ", r: 7, c: 8, w: 1, h: 1, diff: true },
+        { id: 20, name: "長野", capital: "長野", yomi: "ながの", cYomi: "ながの", r: 6, c: 8, w: 1, h: 1, diff: false },
+        { id: 21, name: "岐阜", capital: "岐阜", yomi: "ぎふ", cYomi: "ぎふ", r: 6, c: 7, w: 1, h: 1, diff: false },
+        { id: 22, name: "静岡", capital: "静岡", yomi: "しずおか", cYomi: "しずおか", r: 8, c: 7, w: 1, h: 1, diff: false },
+        { id: 23, name: "愛知", capital: "名古屋", yomi: "あいち", cYomi: "なごや", r: 7, c: 7, w: 1, h: 1, diff: true },
+        { id: 24, name: "三重", capital: "津", yomi: "みえ", cYomi: "つ", r: 8, c: 6, w: 1, h: 1, diff: true },
+        { id: 25, name: "滋賀", capital: "大津", yomi: "しが", cYomi: "おおつ", r: 6, c: 6, w: 1, h: 1, diff: true },
+        { id: 26, name: "京都", capital: "京都", yomi: "きょうと", cYomi: "きょうと", r: 6, c: 5, w: 1, h: 1, diff: false },
+        { id: 27, name: "大阪", capital: "大阪", yomi: "おおさか", cYomi: "おおさか", r: 7, c: 5, w: 1, h: 1, diff: false },
+        { id: 28, name: "兵庫", capital: "神戸", yomi: "ひょうご", cYomi: "こうべ", r: 6, c: 4, w: 1, h: 1, diff: true },
+        { id: 29, name: "奈良", capital: "奈良", yomi: "なら", cYomi: "なら", r: 7, c: 6, w: 1, h: 1, diff: false },
+        { id: 30, name: "和歌山", capital: "和歌山", yomi: "わかやま", cYomi: "わかやま", r: 8, c: 5, w: 1, h: 1, diff: false },
+        { id: 31, name: "鳥取", capital: "鳥取", yomi: "とっとり", cYomi: "とっとり", r: 6, c: 3, w: 1, h: 1, diff: false },
+        { id: 32, name: "島根", capital: "松江", yomi: "しまね", cYomi: "まつえ", r: 6, c: 2, w: 1, h: 1, diff: true },
+        { id: 33, name: "岡山", capital: "岡山", yomi: "おかやま", cYomi: "おかやま", r: 7, c: 3, w: 1, h: 1, diff: false },
+        { id: 34, name: "広島", capital: "広島", yomi: "ひろしま", cYomi: "ひろしま", r: 7, c: 2, w: 1, h: 1, diff: false },
+        { id: 35, name: "山口", capital: "山口", yomi: "やまぐち", cYomi: "やまぐち", r: 7, c: 1, w: 1, h: 1, diff: false },
+        { id: 36, name: "徳島", capital: "徳島", yomi: "とくしま", cYomi: "とくしま", r: 9, c: 4, w: 1, h: 1, diff: false },
+        { id: 37, name: "香川", capital: "高松", yomi: "かがわ", cYomi: "たかまつ", r: 8, c: 4, w: 1, h: 1, diff: true },
+        { id: 38, name: "愛媛", capital: "松山", yomi: "えひめ", cYomi: "まつやま", r: 9, c: 2, w: 1, h: 1, diff: true },
+        { id: 39, name: "高知", capital: "高知", yomi: "こうち", cYomi: "こうち", r: 9, c: 3, w: 1, h: 1, diff: false },
+        { id: 40, name: "福岡", capital: "福岡", yomi: "ふくおか", cYomi: "ふくおか", r: 8, c: 1, w: 1, h: 1, diff: false },
+        { id: 41, name: "佐賀", capital: "佐賀", yomi: "さが", cYomi: "さが", r: 8, c: 0, w: 1, h: 1, diff: false }, // Shifted left
+        { id: 42, name: "長崎", capital: "長崎", yomi: "ながさき", cYomi: "ながさき", r: 9, c: 0, w: 1, h: 1, diff: false },
+        { id: 43, name: "熊本", capital: "熊本", yomi: "くまもと", cYomi: "くまもと", r: 9, c: 1, w: 1, h: 1, diff: false },
+        { id: 44, name: "大分", capital: "大分", yomi: "おおいた", cYomi: "おおいた", r: 8, c: 2, w: 1, h: 1, diff: false },
+        { id: 45, name: "宮崎", capital: "宮崎", yomi: "みやざき", cYomi: "みやざき", r: 10, c: 2, w: 1, h: 1, diff: false },
+        { id: 46, name: "鹿児島", capital: "鹿児島", yomi: "かごしま", cYomi: "かごしま", r: 11, c: 1, w: 1, h: 1, diff: false },
+        { id: 47, name: "沖縄", capital: "那覇", yomi: "おきなわ", cYomi: "なは", r: 12, c: 0, w: 1, h: 1, diff: true }
+    ];
 
-  let currentPref = null;
-  let mistakeCount = 0;
-  let mode = "pref";
-  let isTalking = false;
-  // ★現在赤く塗っている要素を覚えておく変数
-  let activeElement = null; 
-  let originalFill = ""; 
+    let currentMode = 0;
+    let currentPref = null;
+    let recognition;
+    let isListening = false;
 
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const recognition = new SpeechRecognition();
-  recognition.lang = 'ja-JP';
-  recognition.continuous = true;
-
-  // --- 初期化：SVG読み込み ---
-  window.onload = function() {
-    fetch('japan.svg')
-      .then(response => {
-        if (!response.ok) throw new Error("地図ファイルが見つかりません");
-        return response.text();
-      })
-      .then(svgText => {
-        document.getElementById('map-container').innerHTML = svgText;
-        document.getElementById('message').innerText = "スタートボタンを押してね";
-        document.getElementById('btn-start').disabled = false;
-        document.getElementById('btn-start').innerText = "クイズスタート！";
-      })
-      .catch(err => {
-        document.getElementById('message').innerText = "エラー：地図を読み込めません";
-        document.getElementById('status').innerText = "japan.svg が同じフォルダにあるか確認してください。";
-      });
-  };
-
-  // --- ★重要：県を探す関数（改良版） ---
-  function findPrefectureElement(jisCode) {
-    const svg = document.querySelector('svg');
-    if (!svg) return null;
+    // --- Init Map ---
+    const mapContainer = document.getElementById('map-container');
     
-    // "1" と "01" 両方のパターンで探す
-    const code1 = jisCode.toString(); 
-    const code2 = jisCode.toString().padStart(2, '0');
-    
-    // グループタグ <g data-code="..."> を探す
-    let el = svg.querySelector(`g[data-code="${code1}"]`) || svg.querySelector(`g[data-code="${code2}"]`);
-    return el;
-  }
-
-  // --- ゲーム進行 ---
-  function startGame() {
-    document.getElementById("btn-start").style.display = "none";
-    speak("日本地図クイズ！赤くなった場所の名前を答えてね。", () => {
-      try { recognition.start(); } catch(e){}
-      nextQuestion();
-    });
-  }
-
-  function nextQuestion() {
-    mode = "pref";
-    mistakeCount = 0;
-    
-    // ★前の問題をリセット（色を元に戻す）
-    if (activeElement) {
-        activeElement.style.fill = originalFill; // 元の色に戻す
-        activeElement = null;
-    }
-
-    // ランダム出題
-    const randomIndex = Math.floor(Math.random() * prefectures.length);
-    currentPref = prefectures[randomIndex];
-
-    // 要素を探す
-    const targetEl = findPrefectureElement(currentPref.jis);
-
-    if(targetEl) {
-        // ★重要：強制的に色を塗る
-        activeElement = targetEl; // 覚えておく
-        originalFill = targetEl.style.fill; // 元の色を保存しておく
+    // Create grid items
+    prefs.forEach(p => {
+        const div = document.createElement('div');
+        div.className = 'pref-cell';
+        div.innerText = p.name;
+        div.dataset.id = p.id;
+        div.style.gridRowStart = p.r;
+        div.style.gridColumnStart = p.c + 1; // 1-based index
+        div.style.gridRowEnd = `span ${p.h}`;
+        div.style.gridColumnEnd = `span ${p.w}`;
         
-        // style属性を直接書き換えて赤くする（これが最強）
-        targetEl.style.fill = "#ff5252"; 
-        
-        // デバッグ用表示
-        document.getElementById('debug').innerText = `出題中: ${currentPref.names[0]} (Code: ${currentPref.jis})`;
-
-        speak("ここはどこ？");
-    } else {
-        document.getElementById('debug').innerText = `エラー: ${currentPref.names[0]} の地図データが見つかりません`;
-        nextQuestion(); // 見つからない場合はスキップ
-    }
-  }
-
-  // --- 音声認識と判定 ---
-  recognition.onresult = function(event) {
-    if (isTalking) return;
-    const lastResultIdx = event.results.length - 1;
-    const speechText = event.results[lastResultIdx][0].transcript;
-    document.getElementById("status").innerText = `「${speechText}」と聞こえたよ`;
-    checkAnswer(speechText);
-  };
-
-  function checkAnswer(text) {
-    let isCorrect = false;
-    let correctList = (mode === "pref") ? currentPref.names : currentPref.capitalNames;
-    
-    correctList.forEach(ans => {
-      if (text.indexOf(ans) !== -1) isCorrect = true;
+        div.onclick = () => handleMapClick(p);
+        mapContainer.appendChild(div);
     });
 
-    if (isCorrect) {
-      if (mode === "pref") {
-        speak("ピンポン！正解！", () => {
-          mode = "capital";
-          mistakeCount = 0;
-          speak(`${currentPref.names[0]}の、県庁所在地は？`);
-        });
-      } else {
-        speak("すごい！大正解！", () => {
-          setTimeout(nextQuestion, 1500);
-        });
-      }
-    } else {
-      mistakeCount++;
-      if (mistakeCount >= 3) {
-        const answerText = (mode === "pref") ? currentPref.names[0] : currentPref.capital;
-        speak(`ざんねん。正解は、${answerText}、だよ。`, () => nextQuestion());
-      } else {
-        speak("ちがうよ。もう一回答えてね。");
-      }
-    }
-  }
+    // --- Voice Setup ---
+    if ('webkitSpeechRecognition' in window) {
+        recognition = new webkitSpeechRecognition();
+        recognition.lang = 'ja-JP';
+        recognition.continuous = false;
+        recognition.interimResults = false;
 
-  function speak(text, callback) {
-    isTalking = true;
-    document.getElementById("message").innerText = text;
-    const uttr = new SpeechSynthesisUtterance(text);
-    uttr.lang = "ja-JP";
-    uttr.onend = () => {
-      isTalking = false;
-      if (callback) callback();
-    };
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(uttr);
-  }
-  
-  recognition.onend = function() {
-    if(document.getElementById("btn-start").style.display === "none") {
-        try { recognition.start(); } catch(e){}
+        recognition.onstart = () => {
+            isListening = true;
+            document.getElementById('mic-btn').classList.add('listening');
+            document.getElementById('voice-status').innerText = "聞いています...";
+        };
+        recognition.onend = () => {
+            isListening = false;
+            document.getElementById('mic-btn').classList.remove('listening');
+            document.getElementById('voice-status').innerText = "ボタンを押して話してね";
+        };
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            checkVoiceAnswer(transcript);
+        };
+    } else {
+        alert("このブラウザは音声認識に対応していません。ChromeまたはEdgeをご利用ください。");
     }
-  };
+
+    // --- Game Logic ---
+    function showMenu() {
+        document.getElementById('menu-area').style.display = 'block';
+        document.getElementById('game-area').style.display = 'none';
+        resetMap();
+    }
+
+    function startGame(mode) {
+        currentMode = mode;
+        document.getElementById('menu-area').style.display = 'none';
+        document.getElementById('game-area').style.display = 'block';
+        document.getElementById('result-message').innerText = "";
+        
+        // Mode Specific Setup
+        const titles = ["", "1. 地図から県名・県庁所在地", "2. 地図の場所当て", "3. 県名→県庁所在地 (19)", "4. 県庁所在地→県名 (19)"];
+        document.getElementById('mode-title').innerText = titles[mode];
+        
+        // UI Adjustments
+        const map = document.getElementById('map-container');
+        const voice = document.getElementById('voice-controls');
+
+        if (mode === 2) {
+            map.style.pointerEvents = "auto"; // Clickable map
+            voice.style.display = "none"; // No voice for clicking game
+        } else {
+            map.style.pointerEvents = "none"; // View only
+            voice.style.display = "block";
+        }
+
+        nextQuestion();
+    }
+
+    function nextQuestion() {
+        resetMap();
+        document.getElementById('result-message').innerText = "";
+
+        // Filter Questions based on Mode
+        let pool = prefs;
+        if (currentMode === 3 || currentMode === 4) {
+            pool = prefs.filter(p => p.diff); // Only diff 19
+        }
+        
+        // Pick Random
+        currentPref = pool[Math.floor(Math.random() * pool.length)];
+
+        // Display logic
+        const qText = document.getElementById('question-text');
+        const iText = document.getElementById('instruction-text');
+
+        if (currentMode === 1) {
+            qText.innerText = "この場所はどこ？";
+            iText.innerText = "県名と県庁所在地を言ってね（例：「ほっかいどう、さっぽろ」）";
+            highlightMap(currentPref.id);
+        } else if (currentMode === 2) {
+            qText.innerText = `${currentPref.name}県 はどこ？`;
+            iText.innerText = "地図をクリックしてね";
+        } else if (currentMode === 3) {
+            qText.innerText = `${currentPref.name}県`;
+            iText.innerText = "この県の「県庁所在地」は？";
+        } else if (currentMode === 4) {
+            qText.innerText = `${currentPref.capital}市`; // Tokyo might need adjustment but 'City' is usually fine for prompts
+            if(currentPref.name === "東京") qText.innerText = "新宿区（東京都庁）";
+            iText.innerText = "これは何県の県庁所在地？";
+        }
+    }
+
+    // --- Answer Checking ---
+
+    // 1. Voice Answer
+    function toggleRecognition() {
+        if (isListening) recognition.stop();
+        else recognition.start();
+    }
+
+    function checkVoiceAnswer(text) {
+        text = text.replace(/県|市|府|都/g, ""); // Remove suffix for easier matching
+        const correctName = currentPref.name.replace(/県|市|府|都/g, "");
+        const correctCap = currentPref.capital.replace(/県|市|府|都/g, "");
+        const correctYomi = currentPref.yomi;
+        const correctCYomi = currentPref.cYomi;
+
+        let isCorrect = false;
+        let msg = "";
+
+        if (currentMode === 1) {
+            // Needs Name AND Capital? Or allow either? User said "Say Name, Capital".
+            // Let's be generous: If they say both, great. If they say one, maybe OK? 
+            // Strict: Must contain both concepts or user will be confused.
+            // Let's check if the string contains key phonemes.
+            const gotName = text.includes(correctName) || text.includes(correctYomi);
+            const gotCap = text.includes(correctCap) || text.includes(correctCYomi);
+            
+            if (gotName && gotCap) {
+                isCorrect = true;
+                msg = `正解！ ${currentPref.name}（${currentPref.capital}）`;
+            } else if (gotName) {
+                msg = `惜しい！県名は合ってる。県庁所在地は？`;
+            } else {
+                msg = `不正解... 正解は ${currentPref.name}・${currentPref.capital}`;
+            }
+        } else if (currentMode === 3) {
+            // Target: Capital
+            if (text.includes(correctCap) || text.includes(correctCYomi)) {
+                isCorrect = true;
+                msg = `正解！ ${currentPref.capital}`;
+            } else {
+                msg = `違うよ。正解は ${currentPref.capital}`;
+            }
+        } else if (currentMode === 4) {
+            // Target: Prefecture
+            if (text.includes(correctName) || text.includes(correctYomi)) {
+                isCorrect = true;
+                msg = `正解！ ${currentPref.name}`;
+            } else {
+                msg = `違うよ。正解は ${currentPref.name}`;
+            }
+        }
+
+        showResult(isCorrect, msg);
+    }
+
+    // 2. Map Click Answer (Mode 2)
+    function handleMapClick(clickedPref) {
+        if (currentMode !== 2) return;
+        
+        let isCorrect = false;
+        let msg = "";
+
+        if (clickedPref.id === currentPref.id) {
+            isCorrect = true;
+            msg = `正解！ここが ${currentPref.name} です。`;
+        } else {
+            msg = `残念... そこは ${clickedPref.name} です。`;
+        }
+        showResult(isCorrect, msg);
+    }
+
+    function showResult(isCorrect, msg) {
+        const resDiv = document.getElementById('result-message');
+        resDiv.innerText = msg;
+        resDiv.className = "result-msg " + (isCorrect ? "correct" : "wrong");
+
+        if (isCorrect) {
+            // Play chime or wait
+            setTimeout(nextQuestion, 2000);
+        }
+    }
+
+    // --- Helpers ---
+    function resetMap() {
+        document.querySelectorAll('.pref-cell').forEach(el => {
+            el.classList.remove('active');
+            el.style.backgroundColor = "";
+        });
+    }
+
+    function highlightMap(id) {
+        const el = document.querySelector(`.pref-cell[data-id='${id}']`);
+        if (el) el.classList.add('active');
+    }
+
 </script>
 </body>
 </html>
