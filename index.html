@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>都道府県マスター (回答フィードバック修正版)</title>
+    <title>都道府県マスター (完全版)</title>
     <style>
         body { font-family: "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif; text-align: center; background-color: #f0f8ff; padding: 20px; color: #333; }
-        h1 { font-size: 24px; margin-bottom: 10px; }
+        h1 { font-size: 22px; margin-bottom: 5px; }
         .container { max-width: 900px; margin: 0 auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         
         /* Menu Buttons */
@@ -15,14 +15,23 @@
         .menu-btn.hard { background-color: #2196F3; }
         .menu-btn.analysis { background-color: #9C27B0; }
         .menu-btn.sub { background-color: #FF9800; width: 48%; display: inline-block; margin: 5px; font-size: 16px; }
+        .menu-btn.count { background-color: #009688; width: 30%; display: inline-block; margin: 5px; }
 
         /* Areas */
-        #game-area, #region-select-area, #analysis-area { display: none; }
+        #game-area, #region-select-area, #count-select-area, #analysis-area, #summary-area { display: none; }
 
         /* Game UI */
-        .question-box { font-size: 28px; font-weight: bold; margin: 10px 0; min-height: 40px; }
-        .sub-text { font-size: 16px; color: #666; margin-bottom: 10px; min-height: 24px; }
+        .question-box { font-size: 28px; font-weight: bold; margin: 5px 0; min-height: 40px; }
+        .sub-text { font-size: 14px; color: #666; margin-bottom: 5px; min-height: 20px; }
         
+        /* Progress Bar */
+        #progress-container { width: 100%; max-width: 600px; margin: 0 auto 10px auto; background: #eee; height: 20px; border-radius: 10px; overflow: hidden; display: flex; }
+        .prog-bar { height: 100%; transition: width 0.3s; }
+        .prog-correct { background-color: #4CAF50; width: 0%; }
+        .prog-wrong { background-color: #d32f2f; width: 0%; }
+        .prog-remain { background-color: #ddd; flex-grow: 1; }
+        #progress-text { font-size: 12px; margin-bottom: 5px; font-weight: bold; color: #555; }
+
         /* Map Container */
         #map-wrapper {
             width: 100%; max-width: 600px; margin: 0 auto;
@@ -52,13 +61,15 @@
 
         .back-btn { margin-top: 20px; background: #777; padding: 10px 20px; color: white; border: none; border-radius: 4px; cursor: pointer; }
 
-        /* Analysis Graph */
+        /* Analysis & Summary Graph */
         .graph-row { display: flex; align-items: center; margin-bottom: 8px; text-align: left; }
-        .graph-label { width: 100px; font-weight: bold; font-size: 14px; }
+        .graph-label { width: 120px; font-weight: bold; font-size: 14px; }
         .graph-bar-area { flex-grow: 1; background: #eee; height: 20px; border-radius: 10px; overflow: hidden; position: relative; }
         .graph-bar { height: 100%; background: #4CAF50; width: 0%; transition: width 1s; }
         .graph-text { margin-left: 10px; width: 60px; font-size: 14px; }
         .reset-data-btn { background: #d32f2f; font-size: 12px; margin-top: 30px; padding: 5px 10px; }
+        
+        .big-score { font-size: 48px; color: #E91E63; font-weight: bold; margin: 20px 0; }
     </style>
 </head>
 <body>
@@ -66,11 +77,10 @@
 <div class="container">
     <div id="menu-area">
         <h1>🇯🇵 日本地図＆県庁所在地マスター</h1>
-        <p>モードを選んでスタート！</p>
         <button class="menu-btn" onclick="showRegionSelect(1)">1. 地図から「県名」→「県庁所在地」</button>
         <button class="menu-btn" onclick="showRegionSelect(2)">2. 県名を見て「地図」を当てる</button>
-        <button class="menu-btn hard" onclick="startGame(3, 'all')">3. 県名から「県庁所在地」を言う（違う19個）</button>
-        <button class="menu-btn hard" onclick="startGame(4, 'all')">4. 県庁所在地から「県名」を言う（違う19個）</button>
+        <button class="menu-btn hard" onclick="showCountSelect(3, 'all')">3. 県名から「県庁所在地」を言う（違う19個）</button>
+        <button class="menu-btn hard" onclick="showCountSelect(4, 'all')">4. 県庁所在地から「県名」を言う（違う19個）</button>
         <hr>
         <button class="menu-btn analysis" onclick="showAnalysis()">5. 成績・分析（グラフを見る）</button>
     </div>
@@ -82,8 +92,27 @@
         <button class="back-btn" onclick="showMenu()">戻る</button>
     </div>
 
+    <div id="count-select-area">
+        <h2>問題数を選んでね</h2>
+        <div id="count-buttons">
+            <button class="menu-btn count" onclick="initGame(10)">10問</button>
+            <button class="menu-btn count" onclick="initGame(20)">20問</button>
+            <button class="menu-btn count" onclick="initGame(30)">30問</button>
+            <button class="menu-btn count" onclick="initGame(40)">40問</button>
+            <button class="menu-btn count" onclick="initGame(999)">すべて</button>
+        </div>
+        <button class="back-btn" onclick="showMenu()">戻る</button>
+    </div>
+
     <div id="game-area">
-        <h2 id="mode-title">ゲーム中</h2>
+        <div id="progress-text">第 1 問 / 全 10 問</div>
+        <div id="progress-container">
+            <div class="prog-bar prog-correct" id="bar-correct"></div>
+            <div class="prog-bar prog-wrong" id="bar-wrong"></div>
+            <div class="prog-bar prog-remain" id="bar-remain"></div>
+        </div>
+
+        <h2 id="mode-title" style="font-size:16px; margin:5px 0;">ゲーム中</h2>
         <div class="question-box" id="question-text">問題</div>
         <div class="sub-text" id="instruction-text">説明</div>
 
@@ -97,16 +126,22 @@
         </div>
 
         <div class="result-msg" id="result-message"></div>
-        <button class="back-btn" onclick="showMenu()">メニューに戻る</button>
+        <button class="back-btn" onclick="showMenu()">メニュー中断</button>
     </div>
 
     <div id="analysis-area">
         <h2>あなたの成績分析</h2>
-        <p style="margin-bottom:20px; font-size:14px;">（正解率％のグラフ）</p>
         <div id="graph-container"></div>
         <button class="back-btn" onclick="showMenu()">戻る</button>
         <br>
         <button class="reset-data-btn" onclick="resetData()">全てのデータを消去</button>
+    </div>
+
+    <div id="summary-area">
+        <h2>おつかれさま！</h2>
+        <div class="big-score" id="summary-score">100%</div>
+        <p id="summary-detail"></p>
+        <button class="menu-btn" onclick="showMenu()">メニューに戻る</button>
     </div>
 </div>
 
@@ -183,31 +218,18 @@
 
     let currentMode = 0;
     let currentRegion = 'all';
+    let questionQueue = [];
+    let totalQuestions = 0;
+    let currentQuestionIndex = 0;
+    let sessionResults = { correct: 0, wrong: 0 };
+    
     let currentPref = null;
     let recognition;
     let isListening = false;
     let mode1Phase = 'name'; 
     let mistakes = 0;
 
-    // --- Local Storage Logic ---
-    function saveScore(prefId, isCorrect) {
-        let stats = JSON.parse(localStorage.getItem('japanMapStats')) || {};
-        if (!stats[prefId]) stats[prefId] = { correct: 0, total: 0 };
-        
-        stats[prefId].total++;
-        if (isCorrect) stats[prefId].correct++;
-        
-        localStorage.setItem('japanMapStats', JSON.stringify(stats));
-    }
-
-    function resetData() {
-        if(confirm("成績データを全て消去しますか？")) {
-            localStorage.removeItem('japanMapStats');
-            showAnalysis();
-        }
-    }
-
-    // --- Setup ---
+    // --- Interaction Setup ---
     window.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.prefecture').forEach(group => {
             group.addEventListener('click', function() {
@@ -222,59 +244,95 @@
         const container = document.getElementById('region-buttons');
         let html = '';
         Object.keys(regions).forEach(key => {
-            html += `<button class="menu-btn sub" onclick="startGame(${currentMode}, '${key}')">${regions[key]}</button>`;
+            html += `<button class="menu-btn sub" onclick="showCountSelect(${currentMode}, '${key}')">${regions[key]}</button>`;
         });
         container.innerHTML = html;
     }
 
-    if ('webkitSpeechRecognition' in window) {
-        recognition = new webkitSpeechRecognition();
-        recognition.lang = 'ja-JP';
-        recognition.continuous = false;
-        recognition.interimResults = false;
-        recognition.onstart = () => { isListening = true; document.getElementById('mic-btn').classList.add('listening'); document.getElementById('voice-status').innerText = "聞いています..."; };
-        recognition.onend = () => { isListening = false; document.getElementById('mic-btn').classList.remove('listening'); document.getElementById('voice-status').innerText = "ボタンを押して話してね"; };
-        recognition.onresult = (e) => { checkVoiceAnswer(e.results[0][0].transcript); };
-    }
-
-    // --- UI Routing ---
+    // --- Game Initialization ---
+    
+    // UI Routing
     function showMenu() {
+        hideAllScreens();
         document.getElementById('menu-area').style.display = 'block';
-        document.getElementById('region-select-area').style.display = 'none';
-        document.getElementById('game-area').style.display = 'none';
-        document.getElementById('analysis-area').style.display = 'none';
         resetMapColors();
     }
 
     function showRegionSelect(mode) {
         currentMode = mode;
-        setupRegionButtons(); // Refresh to ensure currentMode is captured in onClick
-        document.getElementById('menu-area').style.display = 'none';
+        hideAllScreens();
         document.getElementById('region-select-area').style.display = 'block';
     }
 
+    function showCountSelect(mode, region) {
+        // If specific region is selected (not 'all'), we just start with "all available" in that region
+        // unless you want to limit region questions too. Let's limit only for "All Japan" as requested.
+        currentMode = mode;
+        currentRegion = region;
+
+        if (region !== 'all') {
+            initGame(999); // Max
+        } else {
+            hideAllScreens();
+            document.getElementById('count-select-area').style.display = 'block';
+        }
+    }
+
     function showAnalysis() {
-        document.getElementById('menu-area').style.display = 'none';
+        hideAllScreens();
         document.getElementById('analysis-area').style.display = 'block';
         renderGraph();
     }
 
-    function startGame(mode, region) {
-        initAudio();
-        currentMode = mode;
-        currentRegion = region;
-        
+    function hideAllScreens() {
         document.getElementById('menu-area').style.display = 'none';
         document.getElementById('region-select-area').style.display = 'none';
+        document.getElementById('count-select-area').style.display = 'none';
+        document.getElementById('game-area').style.display = 'none';
+        document.getElementById('analysis-area').style.display = 'none';
+        document.getElementById('summary-area').style.display = 'none';
+    }
+
+    // Prepare Question Pool
+    function initGame(count) {
+        initAudio();
+        hideAllScreens();
         document.getElementById('game-area').style.display = 'block';
         document.getElementById('result-message').innerText = "";
 
+        // Filter Pool
+        let pool = prefs.slice();
+        if (currentMode === 3 || currentMode === 4) {
+            pool = pool.filter(p => p.diff);
+        }
+        if (currentRegion !== 'all') {
+            pool = pool.filter(p => p.reg == currentRegion);
+        }
+
+        // Shuffle (Fisher-Yates)
+        for (let i = pool.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [pool[i], pool[j]] = [pool[j], pool[i]];
+        }
+
+        // Slice to count
+        if (count < pool.length) {
+            pool = pool.slice(0, count);
+        }
+
+        questionQueue = pool;
+        totalQuestions = pool.length;
+        currentQuestionIndex = 0;
+        sessionResults = { correct: 0, wrong: 0 };
+
+        // Set Title
         const titles = ["", "1. 地図から名前", "2. 地図当て", "3. 名前→県庁", "4. 県庁→名前"];
-        document.getElementById('mode-title').innerText = `${titles[mode]} (${regions[region]})`;
+        document.getElementById('mode-title').innerText = `${titles[currentMode]} (${regions[currentRegion]})`;
 
         const voice = document.getElementById('voice-controls');
-        voice.style.display = (mode === 2) ? "none" : "block";
+        voice.style.display = (currentMode === 2) ? "none" : "block";
 
+        updateProgress();
         nextQuestion();
     }
 
@@ -282,29 +340,41 @@
     function nextQuestion() {
         resetMapColors();
         document.getElementById('result-message').innerText = "";
-        mode1Phase = 'name';
-        mistakes = 0;
-
-        let pool = prefs;
         
-        // 1. Filter by Difficulty (Mode 3/4)
-        if (currentMode === 3 || currentMode === 4) {
-            pool = pool.filter(p => p.diff);
-        }
-
-        // 2. Filter by Region
-        if (currentRegion !== 'all') {
-            pool = pool.filter(p => p.reg == currentRegion);
-        }
-        
-        if (pool.length === 0) {
-            alert("対象の県がありません");
-            showMenu();
+        if (questionQueue.length === 0) {
+            finishGame();
             return;
         }
 
-        currentPref = pool[Math.floor(Math.random() * pool.length)];
+        currentPref = questionQueue.pop(); // Get next question
+        currentQuestionIndex++;
+        
+        mode1Phase = 'name';
+        mistakes = 0;
+        
+        updateProgress();
         updateQuestionDisplay();
+    }
+
+    function updateProgress() {
+        document.getElementById('progress-text').innerText = `第 ${currentQuestionIndex} 問 / 全 ${totalQuestions} 問`;
+        
+        // Calculate percentages based on total questions
+        const corP = (sessionResults.correct / totalQuestions) * 100;
+        const wroP = (sessionResults.wrong / totalQuestions) * 100;
+        
+        document.getElementById('bar-correct').style.width = `${corP}%`;
+        document.getElementById('bar-wrong').style.width = `${wroP}%`;
+    }
+
+    function finishGame() {
+        hideAllScreens();
+        document.getElementById('summary-area').style.display = 'block';
+        
+        const rate = Math.round((sessionResults.correct / totalQuestions) * 100) || 0;
+        document.getElementById('summary-score').innerText = `${rate}%`;
+        document.getElementById('summary-detail').innerText = 
+            `全${totalQuestions}問中、正解${sessionResults.correct}問、不正解${sessionResults.wrong}問でした。`;
     }
 
     function updateQuestionDisplay() {
@@ -333,34 +403,30 @@
         }
     }
 
-    // --- Answer Logic ---
+    // --- Answer Handling ---
+    if ('webkitSpeechRecognition' in window) {
+        recognition = new webkitSpeechRecognition();
+        recognition.lang = 'ja-JP';
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.onstart = () => { isListening = true; document.getElementById('mic-btn').classList.add('listening'); document.getElementById('voice-status').innerText = "聞いています..."; };
+        recognition.onend = () => { isListening = false; document.getElementById('mic-btn').classList.remove('listening'); document.getElementById('voice-status').innerText = "ボタンを押して話してね"; };
+        recognition.onresult = (e) => { checkVoiceAnswer(e.results[0][0].transcript); };
+    } else {
+       // mic not supported
+    }
+
     function toggleRecognition() {
         if (!recognition) return alert("音声認識非対応ブラウザです");
         if (isListening) recognition.stop(); else recognition.start();
     }
 
     function checkVoiceAnswer(text) {
-        // Find which prefecture/capital user mentioned
-        let userSaid = "";
-        // Match against any known pref/capital
-        const matched = prefs.find(p => 
-            text.includes(p.name) || text.includes(p.yomi) || 
-            text.includes(p.capital) || text.includes(p.cYomi)
-        );
+        let userSaid = text;
+        const matched = prefs.find(p => text.includes(p.name) || text.includes(p.yomi) || text.includes(p.capital) || text.includes(p.cYomi));
+        if (matched) userSaid = text.includes(matched.capital) || text.includes(matched.cYomi) ? matched.capital : matched.name;
+        else if (text.length > 10) userSaid = "それ";
 
-        if (matched) {
-            // Did they say the capital or the pref name?
-            if (text.includes(matched.capital) || text.includes(matched.cYomi)) {
-                userSaid = matched.capital;
-            } else {
-                userSaid = matched.name;
-            }
-        } else {
-            // If recognized text is short, use it. Else generic "that"
-            userSaid = (text.length > 0 && text.length < 10) ? text : "それ";
-        }
-
-        // Prepare Check Logic
         text = text.replace(/県|市|府|都|区/g, "");
         const pName = currentPref.name.replace(/県|市|府|都/g, "");
         const pCap = currentPref.capital.replace(/県|市|府|都/g, "");
@@ -369,7 +435,7 @@
 
         let isCorrect = false;
         let msg = "";
-        let saveResult = false; // Flag to save to local storage
+        let completedQuestion = false;
 
         if (currentMode === 1) {
             if (mode1Phase === 'name') {
@@ -388,23 +454,21 @@
                 }
             } else {
                 if (text.includes(pCap) || text.includes(cYomi)) {
-                    isCorrect = true;
-                    msg = `正解！${currentPref.capital}！`;
-                    saveResult = true; // Save success on completion
+                    isCorrect = true; msg = `正解！${currentPref.capital}！`; completedQuestion = true;
                 } else {
                     handleMistake(`違うよ、${userSaid}じゃないよ`, `正解は「${currentPref.capital}」でした。`);
                     return;
                 }
             }
         } else if (currentMode === 3) {
-            if (text.includes(pCap) || text.includes(cYomi)) { isCorrect = true; msg = `正解！ ${currentPref.capital}`; saveResult = true; }
+            if (text.includes(pCap) || text.includes(cYomi)) { isCorrect = true; msg = `正解！ ${currentPref.capital}`; completedQuestion = true; }
             else { handleMistake(`違うよ、${userSaid}じゃないよ`, `正解は「${currentPref.capital}」でした。`); return; }
         } else if (currentMode === 4) {
-            if (text.includes(pName) || text.includes(pYomi)) { isCorrect = true; msg = `正解！ ${currentPref.name}県`; saveResult = true; }
+            if (text.includes(pName) || text.includes(pYomi)) { isCorrect = true; msg = `正解！ ${currentPref.name}県`; completedQuestion = true; }
             else { handleMistake(`違うよ、${userSaid}じゃないよ`, `正解は「${currentPref.name}県」でした。`); return; }
         }
 
-        processResult(isCorrect, msg, saveResult);
+        processResult(isCorrect, msg, completedQuestion);
     }
 
     function handleMapClick(id) {
@@ -412,68 +476,69 @@
         const clickedPref = prefs.find(p => p.id === id);
         if (!clickedPref) return;
 
-        let isCorrect = false;
-        let msg = "";
-
         if (id === currentPref.id) {
-            isCorrect = true;
-            msg = `正解！そこが ${currentPref.name} です。`;
+            playCorrectSound();
             colorMap(id, 'correct');
+            processResult(true, `正解！そこが ${currentPref.name} です。`, true);
         } else {
-            msg = `違うよ、そこは ${clickedPref.name} です。`;
+            playWrongSound();
             colorMap(id, 'wrong');
+            processResult(false, `違うよ、そこは ${clickedPref.name} です。`, true); // Map click is instant fail/success for simplicity or we count mistakes? Let's count fail instantly for simplicity in data.
         }
-        processResult(isCorrect, msg, true);
     }
 
     function handleMistake(wrongMsg, failMsg) {
         playWrongSound();
         mistakes++;
         
-        saveScore(currentPref.id, false); 
-
         if (mistakes >= 3) {
-            showResult(false, failMsg);
-            if (currentMode === 1 && mode1Phase === 'name') {
-                setTimeout(() => { mode1Phase = 'capital'; mistakes=0; updateQuestionDisplay(); document.getElementById('result-message').innerText=""; }, 3000);
-            } else {
-                setTimeout(nextQuestion, 3000);
-            }
+            processResult(false, failMsg, true);
         } else {
-            showResult(false, `${wrongMsg} (あと${3-mistakes}回)`);
+            const div = document.getElementById('result-message');
+            div.innerText = `${wrongMsg} (あと${3-mistakes}回)`;
+            div.className = "result-msg wrong";
         }
     }
 
-    function processResult(isCorrect, msg, shouldSave) {
-        if (isCorrect) {
-            playCorrectSound();
-            if (shouldSave) saveScore(currentPref.id, true);
-            showResult(true, msg);
-        } else {
-            playWrongSound();
-            if (shouldSave) saveScore(currentPref.id, false);
-            showResult(false, msg);
+    function processResult(isCorrect, msg, isComplete) {
+        if (isComplete) {
+            // Save Data
+            saveScore(currentPref.id, isCorrect);
+            if (isCorrect) sessionResults.correct++; else sessionResults.wrong++;
+            
+            // Visuals
+            const div = document.getElementById('result-message');
+            div.innerText = msg;
+            div.className = "result-msg " + (isCorrect ? "correct" : "wrong");
+            
+            if (isCorrect) playCorrectSound();
+            
+            setTimeout(nextQuestion, 2000);
         }
     }
 
-    function showResult(isCorrect, msg) {
-        const div = document.getElementById('result-message');
-        div.innerText = msg;
-        div.className = "result-msg " + (isCorrect ? "correct" : "wrong");
-        if (isCorrect) setTimeout(nextQuestion, 2000);
+    // --- Storage & Graph ---
+    function saveScore(prefId, isCorrect) {
+        let stats = JSON.parse(localStorage.getItem('japanMapStats')) || {};
+        if (!stats[prefId]) stats[prefId] = { correct: 0, total: 0 };
+        stats[prefId].total++;
+        if (isCorrect) stats[prefId].correct++;
+        localStorage.setItem('japanMapStats', JSON.stringify(stats));
     }
 
-    // --- Analysis Graph ---
+    function resetData() {
+        if(confirm("成績データを全て消去しますか？")) {
+            localStorage.removeItem('japanMapStats');
+            showAnalysis();
+        }
+    }
+
     function renderGraph() {
         const stats = JSON.parse(localStorage.getItem('japanMapStats')) || {};
         const container = document.getElementById('graph-container');
         container.innerHTML = "";
-
-        // Aggregate by Region
         const regStats = {};
-        Object.keys(regions).forEach(k => {
-            if(k !== 'all') regStats[k] = { correct: 0, total: 0 };
-        });
+        Object.keys(regions).forEach(k => { if(k !== 'all') regStats[k] = { correct: 0, total: 0 }; });
 
         prefs.forEach(p => {
             if (stats[p.id]) {
@@ -486,21 +551,14 @@
             const data = regStats[key];
             let rate = 0;
             if (data.total > 0) rate = Math.round((data.correct / data.total) * 100);
-
             const row = document.createElement('div');
             row.className = 'graph-row';
-            row.innerHTML = `
-                <div class="graph-label">${regions[key]}</div>
-                <div class="graph-bar-area">
-                    <div class="graph-bar" style="width: ${rate}%;"></div>
-                </div>
-                <div class="graph-text">${rate}%</div>
-            `;
+            row.innerHTML = `<div class="graph-label">${regions[key]}</div><div class="graph-bar-area"><div class="graph-bar" style="width: ${rate}%;"></div></div><div class="graph-text">${rate}%</div>`;
             container.appendChild(row);
         });
     }
 
-    // --- Map Helpers ---
+    // --- Helpers ---
     function getMapElement(id) { return document.querySelector(`.prefecture[data-code="${String(id).padStart(2,'0')}"]`); }
     function resetMapColors() { document.querySelectorAll('.prefecture').forEach(el => el.classList.remove('active', 'correct', 'wrong')); }
     function highlightMap(id) { const el = getMapElement(id); if (el) el.classList.add('active'); }
